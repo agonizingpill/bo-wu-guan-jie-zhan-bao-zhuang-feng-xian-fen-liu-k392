@@ -70,6 +70,7 @@ def dispatch(db, loan_id, actor):
     window = record['transit']
     db.execute("UPDATE transit_window SET status='dispatched' WHERE id=%s", (window['id'],))
     change_status(db, loan_id, LoanStatus.DISPATCHED)
+    db.execute('UPDATE exhibit_loan SET dispatched_at=now() WHERE id=%s', (loan_id,))
     audit(db, loan_id, actor, 'dispatched', window_id=window['id'], vehicle=window['vehicle'],
           seal=record['crate']['seal_code'])
     return dossier(db, loan_id), None

@@ -2,10 +2,11 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import loans, reviews, transit, triage
+from . import loans, reviews, sampling, transit, triage
 from .middleware import application_errors, request_history
-from .schemas import (CrateInspection, GallerySetup, LoanIntake, Login, ReopenReview, ReviewDecision,
-                      Role, SampleObservation, StaffMember, TransitReservation, Witness)
+from .schemas import (CrateInspection, GallerySetup, LoanIntake, Login, MonthClose, ReopenReview,
+                      ReviewDecision, Role, SampleObservation, SampleReport, StaffMember,
+                      TransitReservation, Witness)
 from .security import issue_token, require, signed_in, verify_password
 from .storage import audit, connection, queue
 
@@ -130,3 +131,21 @@ def inspect_sample(loan_id: int, data: SampleObservation, staff=Depends(operator
 def reopen_review(loan_id: int, data: ReopenReview, staff=Depends(supervisor)):
     with connection() as db:
         return reviews.reopen(db, loan_id, data, staff.username)
+
+
+@app.get('/sampling/batches')
+def sampling_batches(staff=Depends(signed_in)):
+    with connection() as db:
+        return {'preview': sampling.open_month_preview(db), 'batches': sampling.list_batches(db)}
+
+
+@app.post('/sampling/close', status_code=201)
+def close_sampling_month(data: MonthClose, staff=Depends(operator)):
+    with connection() as db:
+        return sampling.close_month(db, data.period, staff.username)
+
+
+@app.post('/sampling/selections/{selection_id}/report')
+def report_sampling(selection_id: int, data: SampleReport, staff=Depends(operator)):
+    with connection() as db:
+        return sampling.report(db, selection_id, data, staff.username)

@@ -56,7 +56,7 @@ docker compose exec -T backend python -m scripts.seed_demo
 | --- | --- |
 | 界面 | 原生 HTML、CSS、JavaScript ES modules，`frontend/src/pages/`。`components.js` 提供档案索引、标题、状态印记和留痕，`format.js` 与 `api.js` 提供格式及 HTTP 工具，`store.js` 保存当前账号与借展档案。 |
 | 接口和身份 | Python 3.12、FastAPI、JWT、scrypt，`backend/src/app.py`、`security.py`、`middleware.py`。中间件统一请求编号、访问日志和服务异常。 |
-| 业务和持久层 | PostgreSQL 16、psycopg。`backend/migrations/001_archive.sql` 定义领域实体，`schemas.py` 校验输入，`loans.py`、`transit.py`、`triage.py`、`reviews.py` 执行状态规则。 |
+| 业务和持久层 | PostgreSQL 16、psycopg。`backend/migrations/001_archive.sql` 定义领域实体，`002_sampling.sql` 增加月度抽样批次，`schemas.py` 校验输入，`loans.py`、`transit.py`、`triage.py`、`reviews.py`、`sampling.py` 执行状态规则。 |
 | 计算 | Redis 7 队列和独立 Python worker，`backend/src/worker.py`、`scoring.py`。 |
 | 部署 | Nginx 1.27、Docker Compose 五服务。Nginx 将 `/api/` 代理到 FastAPI。PostgreSQL 和 Redis 各有持久卷，后端与 worker 另有共享产物卷。模型留档实际写入 PostgreSQL。 |
 
@@ -72,6 +72,15 @@ docker compose exec -T backend python -m scripts.seed_demo
 - PostgreSQL 保留 `queued` 状态。Redis 通知丢失时，worker 会重新推送数据库中待算的任务。计算失败保留记录并允许同一 case 重试。
 - 派车同时要求封签存在、运输窗口已确认且借展已放行。同一展厅或同一车辆的有效窗口相互排斥。高风险由经办见证、主管签字，改判低风险须留理由并抽检封签。封签不符保留失败记录，仍需重新核验。
 
+## 月度低风险复查抽样
+
+直接放行的低风险借品按月回头复查包装隐患，流程在风险分流页下半区，与派车流程相互独立、不影响放行。
+
+- 每月按**实际派车时间**（派车成功时写入 `exhibit_loan.dispatched_at`）所在的上海自然月，从模型判定为低风险且已派车的借品中，按材质各随机抽取 5 笔；某材质不足 5 笔时全部入选。随机种子由月份经 SHA-256 派生并写库，月结时一次性锁定候选池（`sampling_candidate`）与入选复查单（`sampling_selection`）。
+- 同月重复月结直接返回既有批次，不换样、不重复派单；未来月份不能提前月结。当月未锁定前只给候选预览，不产生复查单。
+- 迟到的检查回报仍写回原批次；未回报的复查单不能计为合格。分流页按材质显示待回报数与样本漏检比例上下界：下界只计已确认隐患，上界把待回报全部按隐患计；该材质收齐后两端收敛为同一实际比例。
+- 派车照常，已派车批次的封存档案保持原样；抽样只读取派车与分流结果，不反向修改借展状态。种子数据附带一个 2026-10 的已锁定批次演示上下界与收敛效果。
+
 ## 共享枚举
 
 | 枚举 | 后端 | 前端 |
@@ -80,5 +89,6 @@ docker compose exec -T backend python -m scripts.seed_demo
 | 借展状态 | SQL 约束、`schemas.py`、`loans.py`、`transit.py`、`triage.py`、`reviews.py`、`worker.py`、seed | `constants.js`、`components.js`、`pages/archive.js`、`pages/transit.js` |
 | 开箱状态 | SQL 约束、`schemas.py`、`reviews.py`、`loans.py`、`worker.py`、seed | `constants.js`、`pages/review.js`、`pages/archive.js` |
 | 材质、包装、路线 | SQL 约束、`schemas.py`、`scoring.py`、seed | `constants.js`、`pages/archive.js`、`pages/triage.js` |
+| 抽样批次与回报状态 | `002_sampling.sql`、`schemas.py`、`sampling.py`、seed | `constants.js`、`pages/triage.js`、`app.js` |
 
 许可证见 [MIT License](LICENSE)。

@@ -58,12 +58,16 @@ async function render() {
   if (!store.staff) { loginPage(); return; }
   const {page, id} = currentRoute();
   try {
-    const [loans, schedule] = await Promise.all([authed('/loans'), page === 'transit' ? authed('/schedule') : []]);
+    const [loans, schedule, sampling] = await Promise.all([
+      authed('/loans'),
+      page === 'transit' ? authed('/schedule') : [],
+      page === 'triage' ? authed('/sampling/batches') : null,
+    ]);
     if (ticket !== generation) return;
     const selected = loans.find((item) => item.id === id) ?? loans.find((item) => item.review) ?? loans[0];
     const record = selected ? await authed(`/loans/${selected.id}`) : null;
     if (ticket !== generation) return;
-    Object.assign(store, {loans, record, schedule});
+    Object.assign(store, {loans, record, schedule, sampling});
     shell(page, renderers[page](store));
     if (record?.triage?.status === 'queued' && page === 'triage') poll = setTimeout(render, 1600);
   } catch (err) {
@@ -73,7 +77,7 @@ async function render() {
   }
 }
 
-function target(action, fields) {
+function target(action, fields, form) {
   const base = `/loans/${store.record?.id}`;
   if (action === 'intake') return ['/loans', {...fields, must_arrive: fromLocal(fields.must_arrive)}];
   if (action === 'crate') {
@@ -87,11 +91,17 @@ function target(action, fields) {
       {...fields, begins_at: fromLocal(fields.begins_at), ends_at: fromLocal(fields.ends_at)}];
   }
   if (action === 'triage') return [`${base}/triage`];
+  if (action === 'sampling-close') return ['/sampling/close', {period: fields.period}];
+  if (action === 'sampling-report') {
+    return [`/sampling/selections/${form.dataset.selection}/report`,
+      {result: fields.result, finding: fields.finding}];
+  }
   return [`${base}/review/${action}`, fields];
 }
 
 const confirmations = {intake: '已建立借展档案', crate: '已保存检查记录', setup: '已登记展厅布置',
-  triage: '已提交风险分流', witness: '已签署开箱见证', decision: '已记录主管决定', sample: '封签抽检通过', reopen: '已重开复核'};
+  triage: '已提交风险分流', witness: '已签署开箱见证', decision: '已记录主管决定', sample: '封签抽检通过',
+  reopen: '已重开复核', 'sampling-close': '月结完成，候选与入选名单已锁定', 'sampling-report': '复查回报已归入原批次'};
 
 app.addEventListener('submit', async (event) => {
   const form = event.target;
@@ -106,7 +116,7 @@ app.addEventListener('submit', async (event) => {
       saveSession(await api('/auth/login', {method: 'POST', data: fields}));
       history.replaceState(null, '', '#archive');
     } else {
-      const [path, data, method = 'POST'] = target(action, fields);
+      const [path, data, method = 'POST'] = target(action, fields, form);
       const response = await authed(path, {data, method});
       if (action === 'intake') history.replaceState(null, '', `#archive/${response.id}`);
       if (action === 'setup' || action === 'transit') store.scheduleDay = fields.begins_at.slice(0, 10);

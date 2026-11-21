@@ -116,3 +116,12 @@ class SampleObservation(BaseModel):
 
 class ReopenReview(BaseModel):
     reason: Reason
+
+
+class MonthClose(BaseModel):
+    period: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r'^\d{4}-(0[1-9]|1[0-2])$')]
+
+
+class SampleReport(BaseModel):
+    result: Literal['pass', 'fail']
+    finding: Reason

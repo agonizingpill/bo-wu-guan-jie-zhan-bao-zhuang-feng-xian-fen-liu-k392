@@ -11,6 +11,7 @@ export const materials = {porcelain: '瓷器', paper: '纸本', bronze: '青铜�
 export const packings = {foam: '泡棉贴合', suspension: '悬托固定', double_wall: '双层箱'};
 export const routes = {direct: '直达', transfer: '中转', mountain: '山地运输'};
 export const windowStates = {setup: '展厅布置', booked: '窗口确认', conflict: '窗口冲突', dispatched: '已派车'};
+export const sampleResults = {pass: '复查合格', fail: '发现包装隐患'};
 export const sections = {
   archive: ['借展档案', '借展单、包装材料与封签'],
   transit: ['运输窗口', '展厅布置、车辆占用与派车'],
@@ -23,4 +24,5 @@ export const auditActions = {
   triage_queued: '进入分流队列', triage_retried: '重试风险分流', triage_scored: '模型判定已归档',
   triage_failed: '分流计算失败', unpack_witnessed: '开箱见证签署', downgrade_sample_required: '主管改判，转抽检',
   unpack_held: '主管暂停运输', unpack_reopened: '主管重开复核', sample_mismatch: '抽检封签不符', sample_cleared: '抽检通过',
+  sampling_closed: '月结锁定抽样', sampling_close_replayed: '月结重跑（沿用名单）', sampling_reported: '月度复查回报',
 };
